@@ -1,0 +1,155 @@
+--------------SEARCH PACKAGE--------------------------
+
+CREATE OR REPLACE PACKAGE search_pkg
+IS
+    FUNCTION get_search_efficiencies
+    (i_unordered_array IN global_types_consts_pkg.g_random_number_nt,
+    i_ordered_array IN global_types_consts_pkg.g_random_number_nt,
+    i_searches IN global_types_consts_pkg.g_search_option_aat)
+    RETURN global_types_consts_pkg.g_average_search_aat;
+END search_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY search_pkg
+IS  
+    TYPE l_target_iterations_rt IS RECORD (
+        l_target global_types_consts_pkg.g_random_number_elem_t,
+        l_iteration_num PLS_INTEGER
+    );
+    TYPE l_search_result_aat IS TABLE OF l_target_iterations_rt
+                          INDEX BY PLS_INTEGER;
+
+    FUNCTION binary_search 
+    (i_sorted_random_numbers IN global_types_consts_pkg.g_random_number_nt,
+    i_target IN global_types_consts_pkg.g_random_number_elem_t) 
+    RETURN l_target_iterations_rt
+    IS
+        l_targets_iterations l_target_iterations_rt := l_target_iterations_rt(i_target, 0);
+    BEGIN
+        <<loop_until_element_found_or_boundaries_overlap>>
+        DECLARE
+            l_low PLS_INTEGER := 1;
+            l_high PLS_INTEGER := i_sorted_random_numbers.COUNT;
+            l_mid PLS_INTEGER;
+            l_iterations PLS_INTEGER := 0;
+        BEGIN
+            WHILE l_low <= l_high 
+            LOOP
+                l_iterations := l_iterations + 1;
+                l_mid := TRUNC((l_low + l_high) / 2);
+                
+                <<return_element_found_or_adjust_boundaries>>
+                CASE 
+                    WHEN i_sorted_random_numbers(l_mid) = i_target THEN
+                        l_targets_iterations.l_iteration_num := l_iterations;
+                        RETURN l_targets_iterations;
+                    WHEN i_sorted_random_numbers(l_mid) < i_target THEN
+                        l_low := l_mid + 1; 
+                    ELSE
+                        l_high := l_mid - 1; 
+                END CASE return_element_found_or_adjust_boundaries;
+            END LOOP;
+        END loop_until_element_found_or_boundaries_overlap;
+        RETURN l_targets_iterations;
+    END binary_search;
+
+    FUNCTION linear_search 
+    (i_sorted_random_numbers IN global_types_consts_pkg.g_random_number_nt,
+    i_target IN global_types_consts_pkg.g_random_number_elem_t) 
+    RETURN l_target_iterations_rt
+    IS
+        l_targets_iterations l_target_iterations_rt := l_target_iterations_rt(i_target, 0);
+    BEGIN
+        <<cycle_through_array_until_target_found>>
+        DECLARE
+            l_iterations PLS_INTEGER := 0;
+        BEGIN
+            FOR indx IN 1..i_sorted_random_numbers.COUNT
+            LOOP
+                l_iterations := l_iterations + 1;
+                
+                <<return_if_found>>
+                IF i_sorted_random_numbers(indx) = i_target THEN
+                    l_targets_iterations.l_iteration_num := l_iterations;
+                    RETURN l_targets_iterations;
+                END IF return_if_found;
+            END LOOP;
+        END cycle_through_array_until_target_found;
+        RETURN l_targets_iterations;
+    END;
+
+    FUNCTION apply_search
+    (i_unordered_array IN global_types_consts_pkg.g_random_number_nt,
+    i_ordered_array IN global_types_consts_pkg.g_random_number_nt,
+    i_search_type IN VARCHAR2)
+    RETURN l_search_result_aat
+    IS
+        search_results l_search_result_aat;
+    BEGIN
+        <<apply_each_search_to_each_element>>
+        FOR indx IN 1..i_unordered_array.COUNT
+        LOOP
+            search_results(indx) := 
+                CASE i_search_type
+                    WHEN 'binary' THEN binary_search(i_ordered_array, i_unordered_array(indx))
+                    WHEN 'linear' THEN linear_search(i_ordered_array, i_unordered_array(indx))
+                END;
+        END LOOP apply_each_search_to_each_element;
+        RETURN search_results;
+    END;
+
+    FUNCTION calculate_search_efficiency
+    (i_search_results IN l_search_result_aat)
+    RETURN global_types_consts_pkg.g_average_search_t
+    IS
+        l_search_efficiency global_types_consts_pkg.g_average_search_t := 0;
+        l_search_iterations_sum PLS_INTEGER := 0;
+    BEGIN
+        <<calculate_total_iterations>>
+        DECLARE 
+            indx PLS_INTEGER := i_search_results.FIRST;
+        BEGIN
+            WHILE indx IS NOT NULL
+            LOOP
+                l_search_iterations_sum := l_search_iterations_sum + i_search_results(indx).l_iteration_num;
+                indx := i_search_results.NEXT(indx);
+            END LOOP;
+        END calculate_total_iterations;
+
+        l_search_efficiency := l_search_iterations_sum / i_search_results.COUNT;
+        RETURN l_search_efficiency;
+    END;
+
+    FUNCTION get_search_efficiencies
+    (i_unordered_array IN global_types_consts_pkg.g_random_number_nt,
+    i_ordered_array IN global_types_consts_pkg.g_random_number_nt,
+    i_searches IN global_types_consts_pkg.g_search_option_aat)
+    RETURN global_types_consts_pkg.g_average_search_aat 
+    IS
+        l_average_searches global_types_consts_pkg.g_average_search_aat;
+        search_results l_search_result_aat;
+        l_searches global_types_consts_pkg.g_search_option_aat := i_searches;
+    BEGIN
+        <<check_search_types_valid>>
+        BEGIN
+            exception_pkg.check_search_option_non_existent(i_searches);
+        EXCEPTION
+            WHEN exception_pkg.exec_non_existent_search THEN
+                l_searches := exception_pkg.handle_non_existent_search;
+        END check_search_types_valid;
+
+        <<get_search_results>>
+        DECLARE
+            l_iterator global_types_consts_pkg.g_search_option_t := l_searches.FIRST;
+        BEGIN
+            WHILE l_iterator IS NOT NULL
+            LOOP
+                search_results := apply_search(i_unordered_array, i_ordered_array, l_iterator);
+                l_average_searches(l_iterator) := calculate_search_efficiency(search_results);
+                l_iterator := l_searches.NEXT(l_iterator);
+            END LOOP;
+        END get_search_results;
+        RETURN l_average_searches;
+    END;
+END search_pkg;
+/

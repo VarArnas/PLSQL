@@ -1,0 +1,155 @@
+-----------------ARRAY MANAGEMENT PACKAGE-----------------------
+
+CREATE OR REPLACE PACKAGE array_management_pkg
+IS
+    FUNCTION random_unique_nt_generation
+    (i_count IN PLS_INTEGER)
+    RETURN global_types_consts_pkg.g_random_number_nt;
+
+    FUNCTION insertion_sort
+    (i_random_numbers IN global_types_consts_pkg.g_random_number_nt)
+    RETURN global_types_consts_pkg.g_random_number_nt; 
+
+    PROCEDURE print_number_array
+    (i_array IN global_types_consts_pkg.g_random_number_nt,
+    i_msg IN VARCHAR2);
+END array_management_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY array_management_pkg
+IS
+    FUNCTION random_unique_nt_generation
+    (i_count IN PLS_INTEGER)
+    RETURN global_types_consts_pkg.g_random_number_nt
+    IS
+        l_random_numbers global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt();
+        l_count PLS_INTEGER;
+    BEGIN
+        <<handle_value_error>>
+        BEGIN
+            exception_pkg.check_if_assign_empty_array_to_index(i_count);
+            l_count := i_count;
+        EXCEPTION
+            WHEN VALUE_ERROR THEN
+                l_count := exception_pkg.handle_assigning_empty_array_to_index;
+        END handle_value_error;
+
+        l_random_numbers.EXTEND(l_count);
+        
+        <<for_each_index_generate_unique_random>>
+        DECLARE
+            SUBTYPE l_unique_check_element_t IS VARCHAR2(100);
+            TYPE l_unique_check_aat IS TABLE OF BOOLEAN 
+                                                    INDEX BY l_unique_check_element_t;
+            l_unique_checks l_unique_check_aat;
+        BEGIN
+            FOR indx IN l_random_numbers.FIRST .. l_random_numbers.LAST
+            LOOP
+                <<loop_while_until_max_attempts_reached_or_unique_generated>>
+                DECLARE 
+                    l_random global_types_consts_pkg.g_random_number_elem_t;
+                    l_attempts PLS_INTEGER := 0;
+                    c_max_attempts CONSTANT PLS_INTEGER := 1000;
+                    l_found_unique BOOLEAN := FALSE;
+                BEGIN
+                    WHILE l_attempts < c_max_attempts AND NOT l_found_unique
+                    LOOP
+                        <<generate_random>>
+                        DECLARE
+                            l_min_value_generate global_types_consts_pkg.g_random_number_elem_t := 
+                                -(POWER(10, global_types_consts_pkg.c_precision - global_types_consts_pkg.c_scale) - POWER(10, -global_types_consts_pkg.c_scale));
+
+                            l_max_value_generate global_types_consts_pkg.g_random_number_elem_t := 
+                                POWER(10, global_types_consts_pkg.c_precision - global_types_consts_pkg.c_scale) - POWER(10, -global_types_consts_pkg.c_scale);
+                        BEGIN
+                            l_random := dbms_random.value(l_min_value_generate, l_max_value_generate);
+                        END generate_random;
+
+                        <<check_if_unique_and_assign>>
+                        CASE
+                            WHEN NOT l_unique_checks.EXISTS(TRIM(TO_CHAR(l_random))) THEN
+                                l_unique_checks(TRIM(TO_CHAR(l_random))) := TRUE;
+                                l_random_numbers(indx) := l_random;
+                                l_found_unique := TRUE;
+                            ELSE 
+                                l_attempts := l_attempts + 1;
+                        END CASE check_if_unique_and_assign;
+                    END LOOP;
+                END loop_while_until_max_attempts_reached_or_unique_generated;
+            END LOOP;
+        END for_each_index_generate_unique_random;
+        RETURN l_random_numbers;
+    END;
+
+    FUNCTION insertion_sort
+    (i_random_numbers IN global_types_consts_pkg.g_random_number_nt)
+    RETURN global_types_consts_pkg.g_random_number_nt 
+    IS
+        l_sorted_random_numbers global_types_consts_pkg.g_random_number_nt;
+    BEGIN
+        <<check_if_invalid>>
+        BEGIN
+            exception_pkg.check_if_array_invalid(i_random_numbers);
+            l_sorted_random_numbers := i_random_numbers;
+        EXCEPTION
+            WHEN COLLECTION_IS_NULL THEN
+                l_sorted_random_numbers := exception_pkg.handle_uninitialized_random_nt;
+            WHEN exception_pkg.exec_empty_array_passed THEN
+                exception_pkg.handle_empty_array_passed;
+        END check_if_invalid;
+        
+        <<sort_each_element_starting_from_second>>
+        DECLARE 
+            l_current_elem global_types_consts_pkg.g_random_number_elem_t;
+            l_inner_indx PLS_INTEGER;
+        BEGIN
+            FOR indx IN 2..l_sorted_random_numbers.COUNT 
+            LOOP
+                l_current_elem := l_sorted_random_numbers(indx);
+                l_inner_indx := indx - 1;
+                
+                <<while_current_element_is_larger_move_previous_forward>>
+                WHILE l_inner_indx >= 1 AND l_current_elem < l_sorted_random_numbers(l_inner_indx)
+                LOOP
+                    l_sorted_random_numbers(l_inner_indx + 1) := l_sorted_random_numbers(l_inner_indx);
+                    l_inner_indx := l_inner_indx - 1;
+                END LOOP while_current_element_is_larger_move_previous_forward;
+                
+                l_sorted_random_numbers(l_inner_indx + 1) := l_current_elem;
+            END LOOP;
+        END sort_each_element_starting_from_second;
+        RETURN l_sorted_random_numbers;
+    END;
+
+    PROCEDURE print_number_array
+    (i_array IN global_types_consts_pkg.g_random_number_nt,
+    i_msg IN VARCHAR2) 
+    IS
+        l_array global_types_consts_pkg.g_random_number_nt;
+    BEGIN 
+       <<check_if_array_valid>>
+       BEGIN
+            exception_pkg.check_if_array_invalid(i_array);
+            l_array := i_array;
+       EXCEPTION
+            WHEN COLLECTION_IS_NULL THEN
+                l_array := exception_pkg.handle_uninitialized_random_nt;
+            WHEN exception_pkg.exec_empty_array_passed THEN
+                exception_pkg.handle_empty_array_passed;
+       END check_if_array_valid;
+
+        DBMS_OUTPUT.PUT_LINE(chr(10) || i_msg);
+
+        <<print_each_element>>
+        DECLARE 
+            indx PLS_INTEGER := l_array.FIRST;
+        BEGIN
+            WHILE indx IS NOT NULL
+            LOOP
+                DBMS_OUTPUT.PUT_LINE('Number is: ' || l_array(indx));
+                indx := l_array.NEXT(indx);
+            END LOOP;
+        END print_each_element;
+    END;
+END array_management_pkg;
+/

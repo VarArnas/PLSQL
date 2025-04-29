@@ -1,0 +1,30 @@
+--------------------INPUT PACKAGE---------------------------------
+
+CREATE OR REPLACE PACKAGE input_pkg
+IS
+    SUBTYPE g_number_read_t IS VARCHAR2(5);
+
+    c_default_value CONSTANT PLS_INTEGER := 10;
+
+    FUNCTION handle_input(i_input IN g_number_read_t) RETURN PLS_INTEGER;
+END input_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY input_pkg
+IS
+    FUNCTION handle_input(i_input IN g_number_read_t)
+    RETURN PLS_INTEGER
+    IS
+        l_n PLS_INTEGER;
+    BEGIN
+        l_n := TO_NUMBER(i_input);
+        exception_pkg.check_input_non_positive(l_n);   
+        RETURN l_n;
+    EXCEPTION
+        WHEN exception_pkg.exec_non_positive_input THEN
+            RETURN exception_pkg.handle_non_positive_input(l_n);
+        WHEN VALUE_ERROR THEN
+            RETURN exception_pkg.handle_assigning_empty_array_to_index;
+    END;
+END input_pkg;
+/

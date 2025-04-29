@@ -1,0 +1,60 @@
+---------------------DEMO PACKAGE------------------------------
+
+CREATE OR REPLACE PACKAGE demo_pkg AS
+  PROCEDURE run_search_efficiency_demo(i_input IN input_pkg.g_number_read_t);
+END demo_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY demo_pkg 
+IS
+  PROCEDURE run_search_efficiency_demo(i_input IN input_pkg.g_number_read_t) 
+  IS
+    l_n PLS_INTEGER;
+    l_random_array global_types_consts_pkg.g_random_number_nt;
+    l_random_sorted_array global_types_consts_pkg.g_random_number_nt;
+    l_search_efficiencies global_types_consts_pkg.g_average_search_aat;
+    l_search_options global_types_consts_pkg.g_search_option_aat := global_types_consts_pkg.g_search_option_aat('binary' => 1, 'linear' => 2);
+    l_all_search_options global_types_consts_pkg.g_search_option_aat;
+
+    -- invalid data for exception testing
+    temp global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt();
+    temp1 global_types_consts_pkg.g_random_number_nt;
+  BEGIN
+    l_n := input_pkg.handle_input(i_input);
+
+    l_random_array := array_management_pkg.random_unique_nt_generation(l_n);
+
+    l_random_sorted_array := array_management_pkg.insertion_sort(l_random_array);
+
+    l_search_efficiencies := search_pkg.get_search_efficiencies(
+      i_unordered_array => l_random_array,
+      i_ordered_array => l_random_sorted_array,
+      i_searches => l_search_options
+    );
+
+    l_all_search_options := global_types_consts_pkg.c_existing_searches;
+
+    array_management_pkg.print_number_array(l_random_array, 'Unsorted array: ');
+    array_management_pkg.print_number_array(l_random_sorted_array, 'Sorted array: ');
+
+    <<check_if_all_search_options_got_created>>
+    BEGIN
+        exception_pkg.check_if_all_keys_of_aat_valid(l_search_efficiencies);
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            l_search_efficiencies := exception_pkg.handle_not_full_search_efficiencies(l_search_efficiencies);
+    END check_if_all_search_options_got_created;
+
+    <<print_all_search_results>>
+    DECLARE
+        l_iterator global_types_consts_pkg.g_search_option_t  := l_all_search_options.FIRST;
+    BEGIN
+        WHILE l_iterator IS NOT NULL
+        LOOP
+            DBMS_OUTPUT.PUT_LINE(chr(10) || l_iterator || ' average: ' || l_search_efficiencies(l_iterator) || chr(10));
+            l_iterator := l_all_search_options.NEXT(l_iterator);
+        END LOOP;
+    END print_all_search_results;
+  END run_search_efficiency_demo;
+END demo_pkg;
+/

@@ -1,0 +1,20 @@
+-------------------------GLOBAL TYPES PACKAGE-------------------------------
+
+CREATE OR REPLACE PACKAGE global_types_consts_pkg
+IS
+    c_precision CONSTANT NUMBER := 5; 
+    c_scale CONSTANT NUMBER := 2; 
+
+    SUBTYPE g_random_number_elem_t IS NUMBER(c_precision, c_scale);
+    SUBTYPE g_average_search_t IS NUMBER(38,2);
+    SUBTYPE g_search_option_t IS VARCHAR2(20);
+
+    TYPE g_random_number_nt IS TABLE OF g_random_number_elem_t;
+    TYPE g_average_search_aat IS TABLE OF g_average_search_t
+                            INDEX BY g_search_option_t;
+    TYPE g_search_option_aat IS TABLE OF PLS_INTEGER
+                            INDEX BY g_search_option_t;
+
+    c_existing_searches CONSTANT g_search_option_aat := g_search_option_aat('binary' => 1, 'linear' => 2);
+END global_types_consts_pkg;
+/
