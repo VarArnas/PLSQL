@@ -20,7 +20,7 @@ IS
 
     c_default_message CONSTANT error_log.error_message%TYPE := 'An exception was raised which does not exist';
 
-    PROCEDURE handle_exception(i_backtrace IN VARCHAR2, i_code IN PLS_INTEGER, i_user IN VARCHAR2, i_date IN DATE);
+    PROCEDURE handle_exception(i_backtrace IN VARCHAR2, i_code IN PLS_INTEGER, i_user IN error_log.username%TYPE, i_date IN error_log.error_time%TYPE);
 END exception_pkg;
 /
 
@@ -118,8 +118,8 @@ IS
     PROCEDURE handle_exception
     (i_backtrace IN VARCHAR2,
     i_code IN PLS_INTEGER,
-    i_user IN VARCHAR2,
-    i_date IN DATE) 
+    i_user IN error_log.username%TYPE,
+    i_date IN error_log.error_time%TYPE) 
     IS
         l_err_msg error_log.error_message%TYPE;
         l_backtrace l_backtrace_rt;
