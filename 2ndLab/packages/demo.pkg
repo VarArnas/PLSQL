@@ -19,6 +19,9 @@ IS
     -- invalid data for exception testing
     temp global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt();
     temp1 global_types_consts_pkg.g_random_number_nt;
+    temp2 global_types_consts_pkg.g_search_option_aat := global_types_consts_pkg.g_search_option_aat('asdawdas' => 1, 'linear' => 2);
+    temp3 global_types_consts_pkg.g_search_option_aat := global_types_consts_pkg.g_search_option_aat('linear' => 1);
+    temp4 PLS_INTEGER := 0;
   BEGIN
     l_n := input_pkg.handle_input(i_input);
 
@@ -29,30 +32,52 @@ IS
     l_search_efficiencies := search_pkg.get_search_efficiencies(
       i_unordered_array => l_random_array,
       i_ordered_array => l_random_sorted_array,
-      i_searches => l_search_options
+      i_searches => temp3
     );
-
-    l_all_search_options := global_types_consts_pkg.c_existing_searches;
 
     array_management_pkg.print_number_array(l_random_array, 'Unsorted array: ');
     array_management_pkg.print_number_array(l_random_sorted_array, 'Sorted array: ');
 
     <<check_if_all_search_options_got_created>>
+    DECLARE
+        l_iterator global_types_consts_pkg.g_search_option_t := global_types_consts_pkg.c_existing_searches.FIRST;
     BEGIN
-        exception_pkg.check_if_all_keys_of_aat_valid(l_search_efficiencies);
+        WHILE l_iterator IS NOT NULL
+        LOOP
+            IF NOT l_search_efficiencies.EXISTS(l_iterator) THEN
+                RAISE NO_DATA_FOUND;
+            END IF;
+            l_iterator := global_types_consts_pkg.c_existing_searches.NEXT(l_iterator);
+        END LOOP;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            l_search_efficiencies := exception_pkg.handle_not_full_search_efficiencies(l_search_efficiencies);
+            exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+
+            <<add_non_existent_search_efficiencies>>
+            DECLARE
+                l_iterator global_types_consts_pkg.g_search_option_t := global_types_consts_pkg.c_existing_searches.FIRST;
+                c_default_search_efficiency PLS_INTEGER := 0;
+            BEGIN
+                WHILE l_iterator IS NOT NULL
+                LOOP
+                    IF NOT l_search_efficiencies.EXISTS(l_iterator) THEN
+                        l_search_efficiencies(l_iterator) := c_default_search_efficiency;
+                    END IF;
+                    l_iterator := global_types_consts_pkg.c_existing_searches.NEXT(l_iterator);
+                END LOOP;
+            END add_non_existent_search_efficiencies;
+        WHEN OTHERS THEN
+            RAISE;
     END check_if_all_search_options_got_created;
 
     <<print_all_search_results>>
     DECLARE
-        l_iterator global_types_consts_pkg.g_search_option_t  := l_all_search_options.FIRST;
+        l_iterator global_types_consts_pkg.g_search_option_t  := global_types_consts_pkg.c_existing_searches.FIRST;
     BEGIN
         WHILE l_iterator IS NOT NULL
         LOOP
             DBMS_OUTPUT.PUT_LINE(chr(10) || l_iterator || ' average: ' || l_search_efficiencies(l_iterator) || chr(10));
-            l_iterator := l_all_search_options.NEXT(l_iterator);
+            l_iterator := global_types_consts_pkg.c_existing_searches.NEXT(l_iterator);
         END LOOP;
     END print_all_search_results;
   END run_search_efficiency_demo;

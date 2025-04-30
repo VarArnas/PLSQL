@@ -1,5 +1,3 @@
------------------ARRAY MANAGEMENT PACKAGE-----------------------
-
 CREATE OR REPLACE PACKAGE array_management_pkg
 IS
     FUNCTION random_unique_nt_generation
@@ -18,23 +16,30 @@ END array_management_pkg;
 
 CREATE OR REPLACE PACKAGE BODY array_management_pkg
 IS
+
+    c_default_numbers CONSTANT global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt(-50, -40, -30, -20, -10, 10, 20, 30, 40, 50);
+
     FUNCTION random_unique_nt_generation
     (i_count IN PLS_INTEGER)
     RETURN global_types_consts_pkg.g_random_number_nt
     IS
         l_random_numbers global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt();
-        l_count PLS_INTEGER;
+        c_default_count CONSTANT PLS_INTEGER := 10;
     BEGIN
+        l_random_numbers.EXTEND(i_count);
+
         <<handle_value_error>>
         BEGIN
-            exception_pkg.check_if_assign_empty_array_to_index(i_count);
-            l_count := i_count;
+            IF l_random_numbers.COUNT = 0 THEN
+                RAISE VALUE_ERROR;
+            END IF;
         EXCEPTION
             WHEN VALUE_ERROR THEN
-                l_count := exception_pkg.handle_assigning_empty_array_to_index;
+                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                l_random_numbers.EXTEND(c_default_count);
+            WHEN OTHERS THEN
+                RAISE;
         END handle_value_error;
-
-        l_random_numbers.EXTEND(l_count);
         
         <<for_each_index_generate_unique_random>>
         DECLARE
@@ -89,14 +94,25 @@ IS
     BEGIN
         <<check_if_invalid>>
         BEGIN
-            exception_pkg.check_if_array_invalid(i_random_numbers);
-            l_sorted_random_numbers := i_random_numbers;
+            <<check_if_null>>
+            IF i_random_numbers IS NULL THEN
+                RAISE COLLECTION_IS_NULL;
+            END IF check_if_null;
+        
+            <<check_if_empty>>
+            IF i_random_numbers.COUNT = 0 THEN
+                RAISE exception_pkg.exec_empty_array_passed;
+            END IF check_if_empty;     
+
+            l_sorted_random_numbers := i_random_numbers;       
         EXCEPTION
-            WHEN COLLECTION_IS_NULL THEN
-                l_sorted_random_numbers := exception_pkg.handle_uninitialized_random_nt;
-            WHEN exception_pkg.exec_empty_array_passed THEN
-                exception_pkg.handle_empty_array_passed;
+            WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
+                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                l_sorted_random_numbers := c_default_numbers;
+            WHEN OTHERS THEN
+                RAISE;
         END check_if_invalid;
+
         
         <<sort_each_element_starting_from_second>>
         DECLARE 
@@ -127,16 +143,26 @@ IS
     IS
         l_array global_types_consts_pkg.g_random_number_nt;
     BEGIN 
-       <<check_if_array_valid>>
-       BEGIN
-            exception_pkg.check_if_array_invalid(i_array);
-            l_array := i_array;
-       EXCEPTION
-            WHEN COLLECTION_IS_NULL THEN
-                l_array := exception_pkg.handle_uninitialized_random_nt;
-            WHEN exception_pkg.exec_empty_array_passed THEN
-                exception_pkg.handle_empty_array_passed;
-       END check_if_array_valid;
+       <<check_if_invalid>>
+        BEGIN
+            <<check_if_null>>
+            IF i_array IS NULL THEN
+                RAISE COLLECTION_IS_NULL;
+            END IF check_if_null;
+        
+            <<check_if_empty>>
+            IF i_array.COUNT = 0 THEN
+                RAISE exception_pkg.exec_empty_array_passed;
+            END IF check_if_empty;     
+
+            l_array := i_array;       
+        EXCEPTION
+            WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
+                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                l_array := c_default_numbers;
+            WHEN OTHERS THEN
+                RAISE;
+        END check_if_invalid;
 
         DBMS_OUTPUT.PUT_LINE(chr(10) || i_msg);
 

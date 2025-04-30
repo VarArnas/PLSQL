@@ -131,11 +131,22 @@ IS
         l_searches global_types_consts_pkg.g_search_option_aat := i_searches;
     BEGIN
         <<check_search_types_valid>>
+        DECLARE
+            l_iterator global_types_consts_pkg.g_search_option_t := i_searches.FIRST;
         BEGIN
-            exception_pkg.check_search_option_non_existent(i_searches);
+            WHILE l_iterator IS NOT NULL
+            LOOP
+                IF NOT global_types_consts_pkg.c_existing_searches.EXISTS(l_iterator) THEN
+                    RAISE exception_pkg.exec_non_existent_search;
+                END IF;
+                l_iterator := i_searches.NEXT(l_iterator);
+            END LOOP;
         EXCEPTION
             WHEN exception_pkg.exec_non_existent_search THEN
-                l_searches := exception_pkg.handle_non_existent_search;
+                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                l_searches := global_types_consts_pkg.c_existing_searches;
+            WHEN OTHERS THEN
+                RAISE;
         END check_search_types_valid;
 
         <<get_search_results>>
