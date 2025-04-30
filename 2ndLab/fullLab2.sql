@@ -43,7 +43,7 @@ IS
 
     c_default_message CONSTANT error_log.error_message%TYPE := 'An exception was raised which does not exist';
 
-    PROCEDURE handle_exception(i_backtrace IN VARCHAR2, i_code IN PLS_INTEGER, i_user IN VARCHAR2, i_date IN DATE);
+    PROCEDURE handle_exception(i_backtrace IN VARCHAR2, i_code IN PLS_INTEGER, i_user IN error_log.username%TYPE, i_date IN error_log.error_time%TYPE);
 END exception_pkg;
 /
 
@@ -141,8 +141,8 @@ IS
     PROCEDURE handle_exception
     (i_backtrace IN VARCHAR2,
     i_code IN PLS_INTEGER,
-    i_user IN VARCHAR2,
-    i_date IN DATE) 
+    i_user IN error_log.username%TYPE,
+    i_date IN error_log.error_time%TYPE) 
     IS
         l_err_msg error_log.error_message%TYPE;
         l_backtrace l_backtrace_rt;
@@ -562,7 +562,6 @@ IS
     l_random_sorted_array global_types_consts_pkg.g_random_number_nt;
     l_search_efficiencies global_types_consts_pkg.g_average_search_aat;
     l_search_options global_types_consts_pkg.g_search_option_aat := global_types_consts_pkg.g_search_option_aat('binary' => 1, 'linear' => 2);
-    l_all_search_options global_types_consts_pkg.g_search_option_aat;
 
     -- invalid data for exception testing
     temp global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt();
@@ -580,7 +579,7 @@ IS
     l_search_efficiencies := search_pkg.get_search_efficiencies(
       i_unordered_array => l_random_array,
       i_ordered_array => l_random_sorted_array,
-      i_searches => temp3
+      i_searches => l_search_options
     );
 
     array_management_pkg.print_number_array(l_random_array, 'Unsorted array: ');
