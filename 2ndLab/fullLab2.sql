@@ -18,6 +18,8 @@ IS
                             INDEX BY g_search_option_t;
 
     c_existing_searches CONSTANT g_search_option_aat := g_search_option_aat('binary' => 1, 'linear' => 2);
+    c_default_array CONSTANT global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt(-50, -40, -30, -20, -10, 10, 20, 30, 40, 50);
+    c_default_array_size CONSTANT PLS_INTEGER := 20;
 END global_types_consts_pkg;
 /
 
@@ -25,9 +27,9 @@ END global_types_consts_pkg;
 
 CREATE OR REPLACE PACKAGE exception_pkg
 IS
-    c_non_positive_input CONSTANT NUMBER := -20001;
-    c_non_positive_input_message CONSTANT error_log.error_message%TYPE := 'A non positive number was given as random unique array size';
-    exec_non_positive_input EXCEPTION;
+    c_array_sizes_do_not_match CONSTANT NUMBER := -20001;
+    c_array_sizes_do_not_match_message CONSTANT error_log.error_message%TYPE := 'Two arrays were passed for search efficiencies, which sizes do not match';
+    exec_array_sizes_do_not_match EXCEPTION;
 
     c_non_existent_search CONSTANT NUMBER := -20002;
     c_non_existent_search_message CONSTANT error_log.error_message%TYPE := 'A non existent search option was given for getting search efficiencies';
@@ -37,7 +39,7 @@ IS
     c_empty_array_message CONSTANT error_log.error_message%TYPE := 'The passed in array did not have any elements';
     exec_empty_array_passed EXCEPTION;
 
-    PRAGMA EXCEPTION_INIT(exec_non_positive_input, c_non_positive_input);
+    PRAGMA EXCEPTION_INIT(exec_array_sizes_do_not_match, c_array_sizes_do_not_match);
     PRAGMA EXCEPTION_INIT(exec_non_existent_search, c_non_existent_search);
     PRAGMA EXCEPTION_INIT(exec_empty_array_passed, c_empty_array_passed);
 
@@ -113,7 +115,7 @@ IS
             CASE 
                 WHEN i_code BETWEEN -20999 AND -20001 THEN
                     CASE i_code
-                        WHEN -20001 THEN c_non_positive_input_message
+                        WHEN -20001 THEN c_array_sizes_do_not_match_message
                         WHEN -20002 THEN c_non_existent_search_message
                         WHEN -20003 THEN c_empty_array_message
                         ELSE c_default_message
@@ -156,45 +158,6 @@ IS
 END exception_pkg;
 /
 
---------------------INPUT PACKAGE---------------------------------
-
-CREATE OR REPLACE PACKAGE input_pkg
-IS
-    SUBTYPE g_number_read_t IS VARCHAR2(5);
-
-    c_default_value CONSTANT PLS_INTEGER := 10;
-
-    FUNCTION handle_input(i_input IN g_number_read_t) RETURN PLS_INTEGER;
-END input_pkg;
-/
-
-CREATE OR REPLACE PACKAGE BODY input_pkg
-IS
-    FUNCTION handle_input(i_input IN g_number_read_t)
-    RETURN PLS_INTEGER
-    IS
-        l_n PLS_INTEGER;
-        c_default_input CONSTANT PLS_INTEGER := 10;
-    BEGIN
-        l_n := TO_NUMBER(i_input);
-
-        <<check_if_non_positive>>
-        IF l_n <= 0 THEN
-            RAISE exception_pkg.exec_non_positive_input; 
-        END IF check_if_non_positive;
-
-        RETURN l_n;
-    EXCEPTION
-        WHEN exception_pkg.exec_non_positive_input THEN
-            exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
-            RETURN (l_n * -1) + 1;
-        WHEN VALUE_ERROR THEN
-            exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
-            RETURN c_default_input;
-    END;
-END input_pkg;
-/
-
 -----------------ARRAY MANAGEMENT PACKAGE-----------------------
 
 CREATE OR REPLACE PACKAGE array_management_pkg
@@ -216,26 +179,23 @@ END array_management_pkg;
 CREATE OR REPLACE PACKAGE BODY array_management_pkg
 IS
 
-    c_default_numbers CONSTANT global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt(-50, -40, -30, -20, -10, 10, 20, 30, 40, 50);
-
     FUNCTION random_unique_nt_generation
     (i_count IN PLS_INTEGER)
     RETURN global_types_consts_pkg.g_random_number_nt
     IS
         l_random_numbers global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt();
-        c_default_count CONSTANT PLS_INTEGER := 10;
     BEGIN
-        l_random_numbers.EXTEND(i_count);
 
         <<handle_value_error>>
         BEGIN
-            IF l_random_numbers.COUNT = 0 THEN
+            IF i_count <= 0 THEN
                 RAISE VALUE_ERROR;
             END IF;
+            l_random_numbers.EXTEND(i_count);
         EXCEPTION
             WHEN VALUE_ERROR THEN
                 exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
-                l_random_numbers.EXTEND(c_default_count);
+                l_random_numbers.EXTEND(global_types_consts_pkg.c_default_array_size);
             WHEN OTHERS THEN
                 RAISE;
         END handle_value_error;
@@ -307,7 +267,7 @@ IS
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
                 exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
-                l_sorted_random_numbers := c_default_numbers;
+                l_sorted_random_numbers := random_unique_nt_generation(global_types_consts_pkg.c_default_array_size);
             WHEN OTHERS THEN
                 RAISE;
         END check_if_invalid;
@@ -358,7 +318,7 @@ IS
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
                 exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
-                l_array := c_default_numbers;
+                l_array := global_types_consts_pkg.c_default_array;
             WHEN OTHERS THEN
                 RAISE;
         END check_if_invalid;
@@ -388,6 +348,8 @@ IS
     i_ordered_array IN global_types_consts_pkg.g_random_number_nt,
     i_searches IN global_types_consts_pkg.g_search_option_aat)
     RETURN global_types_consts_pkg.g_average_search_aat;
+
+    PROCEDURE print_all_search_efficiencies(i_search_efficiencies IN global_types_consts_pkg.g_average_search_aat);
 END search_pkg;
 /
 
@@ -510,7 +472,64 @@ IS
         l_average_searches global_types_consts_pkg.g_average_search_aat;
         search_results l_search_result_aat;
         l_searches global_types_consts_pkg.g_search_option_aat := i_searches;
+        l_unordered_array global_types_consts_pkg.g_random_number_nt;
+        l_ordered_array global_types_consts_pkg.g_random_number_nt;
     BEGIN
+        <<check_if_unordered_valid>>
+        BEGIN
+            <<check_if_null>>
+            IF i_unordered_array IS NULL THEN
+                RAISE COLLECTION_IS_NULL;
+            END IF check_if_null;
+        
+            <<check_if_empty>>
+            IF i_unordered_array.COUNT = 0 THEN
+                RAISE exception_pkg.exec_empty_array_passed;
+            END IF check_if_empty;     
+
+            l_unordered_array := i_unordered_array;  
+        EXCEPTION
+            WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
+                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                l_unordered_array := global_types_consts_pkg.c_default_array;
+            WHEN OTHERS THEN
+                RAISE;
+        END check_if_unordered_valid;
+
+        <<check_if_ordered_valid>>
+        BEGIN
+            <<check_if_null>>
+            IF i_ordered_array IS NULL THEN
+                RAISE COLLECTION_IS_NULL;
+            END IF check_if_null;
+        
+            <<check_if_empty>>
+            IF i_ordered_array.COUNT = 0 THEN
+                RAISE exception_pkg.exec_empty_array_passed;
+            END IF check_if_empty;     
+
+            l_ordered_array := i_ordered_array;  
+        EXCEPTION
+            WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
+                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                l_ordered_array := global_types_consts_pkg.c_default_array;
+            WHEN OTHERS THEN
+                RAISE;
+        END check_if_ordered_valid;
+
+        <<check_array_sizes>>
+        BEGIN
+            IF l_unordered_array.COUNT <> l_ordered_array.COUNT THEN
+                RAISE exception_pkg.exec_array_sizes_do_not_match;
+            END IF;
+        EXCEPTION
+            WHEN exception_pkg.exec_array_sizes_do_not_match THEN
+                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                l_ordered_array := array_management_pkg.insertion_sort(l_unordered_array);
+            WHEN OTHERS THEN
+                RAISE;
+        END check_array_sizes;
+
         <<check_search_types_valid>>
         DECLARE
             l_iterator global_types_consts_pkg.g_search_option_t := i_searches.FIRST;
@@ -536,28 +555,69 @@ IS
         BEGIN
             WHILE l_iterator IS NOT NULL
             LOOP
-                search_results := apply_search(i_unordered_array, i_ordered_array, l_iterator);
+                search_results := apply_search(l_unordered_array, l_ordered_array, l_iterator);
                 l_average_searches(l_iterator) := calculate_search_efficiency(search_results);
                 l_iterator := l_searches.NEXT(l_iterator);
             END LOOP;
         END get_search_results;
         RETURN l_average_searches;
     END;
+
+    PROCEDURE print_all_search_efficiencies(i_search_efficiencies IN global_types_consts_pkg.g_average_search_aat) 
+    IS
+        l_search_efficiencies global_types_consts_pkg.g_average_search_aat := i_search_efficiencies;
+    BEGIN
+        <<check_if_all_search_options_got_created>>
+        DECLARE
+            l_iterator global_types_consts_pkg.g_search_option_t := global_types_consts_pkg.c_existing_searches.FIRST;
+        BEGIN
+            WHILE l_iterator IS NOT NULL
+            LOOP
+                IF NOT l_search_efficiencies.EXISTS(l_iterator) THEN
+                    RAISE NO_DATA_FOUND;
+                END IF;
+                l_iterator := global_types_consts_pkg.c_existing_searches.NEXT(l_iterator);
+            END LOOP;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+
+                <<add_non_existent_search_efficiencies>>
+                DECLARE
+                    l_iterator global_types_consts_pkg.g_search_option_t := global_types_consts_pkg.c_existing_searches.FIRST;
+                    c_default_search_efficiency PLS_INTEGER := 0;
+                BEGIN
+                    WHILE l_iterator IS NOT NULL
+                    LOOP
+                        IF NOT l_search_efficiencies.EXISTS(l_iterator) THEN
+                            l_search_efficiencies(l_iterator) := c_default_search_efficiency;
+                        END IF;
+                        l_iterator := global_types_consts_pkg.c_existing_searches.NEXT(l_iterator);
+                    END LOOP;
+                END add_non_existent_search_efficiencies;
+            WHEN OTHERS THEN
+                RAISE;
+        END check_if_all_search_options_got_created;
+
+        <<print_all_search_results>>
+        DECLARE
+            l_iterator global_types_consts_pkg.g_search_option_t  := global_types_consts_pkg.c_existing_searches.FIRST;
+        BEGIN
+            WHILE l_iterator IS NOT NULL
+            LOOP
+                DBMS_OUTPUT.PUT_LINE(chr(10) || l_iterator || ' average: ' || l_search_efficiencies(l_iterator) || chr(10));
+                l_iterator := global_types_consts_pkg.c_existing_searches.NEXT(l_iterator);
+            END LOOP;
+        END print_all_search_results;
+    END;
 END search_pkg;
 /
 
----------------------DEMO PACKAGE------------------------------
+-------------------------ANONYMOUS BLOCK------------------------------------
 
-CREATE OR REPLACE PACKAGE demo_pkg AS
-  PROCEDURE run_search_efficiency_demo(i_input IN input_pkg.g_number_read_t);
-END demo_pkg;
-/
-
-CREATE OR REPLACE PACKAGE BODY demo_pkg 
-IS
-  PROCEDURE run_search_efficiency_demo(i_input IN input_pkg.g_number_read_t) 
-  IS
-    l_n PLS_INTEGER;
+<<paieskos_algoritmu_efektyvumo_tyrimas>>
+DECLARE
+    l_n CONSTANT PLS_INTEGER := 30;
     l_random_array global_types_consts_pkg.g_random_number_nt;
     l_random_sorted_array global_types_consts_pkg.g_random_number_nt;
     l_search_efficiencies global_types_consts_pkg.g_average_search_aat;
@@ -569,9 +629,7 @@ IS
     temp2 global_types_consts_pkg.g_search_option_aat := global_types_consts_pkg.g_search_option_aat('asdawdas' => 1, 'linear' => 2);
     temp3 global_types_consts_pkg.g_search_option_aat := global_types_consts_pkg.g_search_option_aat('linear' => 1);
     temp4 PLS_INTEGER := 0;
-  BEGIN
-    l_n := input_pkg.handle_input(i_input);
-
+BEGIN
     l_random_array := array_management_pkg.random_unique_nt_generation(l_n);
 
     l_random_sorted_array := array_management_pkg.insertion_sort(l_random_array);
@@ -579,62 +637,12 @@ IS
     l_search_efficiencies := search_pkg.get_search_efficiencies(
       i_unordered_array => l_random_array,
       i_ordered_array => l_random_sorted_array,
-      i_searches => l_search_options
+      i_searches => temp3
     );
 
     array_management_pkg.print_number_array(l_random_array, 'Unsorted array: ');
     array_management_pkg.print_number_array(l_random_sorted_array, 'Sorted array: ');
 
-    <<check_if_all_search_options_got_created>>
-    DECLARE
-        l_iterator global_types_consts_pkg.g_search_option_t := global_types_consts_pkg.c_existing_searches.FIRST;
-    BEGIN
-        WHILE l_iterator IS NOT NULL
-        LOOP
-            IF NOT l_search_efficiencies.EXISTS(l_iterator) THEN
-                RAISE NO_DATA_FOUND;
-            END IF;
-            l_iterator := global_types_consts_pkg.c_existing_searches.NEXT(l_iterator);
-        END LOOP;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
-
-            <<add_non_existent_search_efficiencies>>
-            DECLARE
-                l_iterator global_types_consts_pkg.g_search_option_t := global_types_consts_pkg.c_existing_searches.FIRST;
-                c_default_search_efficiency PLS_INTEGER := 0;
-            BEGIN
-                WHILE l_iterator IS NOT NULL
-                LOOP
-                    IF NOT l_search_efficiencies.EXISTS(l_iterator) THEN
-                        l_search_efficiencies(l_iterator) := c_default_search_efficiency;
-                    END IF;
-                    l_iterator := global_types_consts_pkg.c_existing_searches.NEXT(l_iterator);
-                END LOOP;
-            END add_non_existent_search_efficiencies;
-        WHEN OTHERS THEN
-            RAISE;
-    END check_if_all_search_options_got_created;
-
-    <<print_all_search_results>>
-    DECLARE
-        l_iterator global_types_consts_pkg.g_search_option_t  := global_types_consts_pkg.c_existing_searches.FIRST;
-    BEGIN
-        WHILE l_iterator IS NOT NULL
-        LOOP
-            DBMS_OUTPUT.PUT_LINE(chr(10) || l_iterator || ' average: ' || l_search_efficiencies(l_iterator) || chr(10));
-            l_iterator := global_types_consts_pkg.c_existing_searches.NEXT(l_iterator);
-        END LOOP;
-    END print_all_search_results;
-  END run_search_efficiency_demo;
-END demo_pkg;
-/
-
--------------------------ANONYMOUS BLOCK------------------------------------
-
-<<paieskos_algoritmu_efektyvumo_tyrimas>>
-BEGIN
-    demo_pkg.run_search_efficiency_demo('&l_n');
+    search_pkg.print_all_search_efficiencies(l_search_efficiencies);
 END paieskos_algoritmu_efektyvumo_tyrimas;
 /

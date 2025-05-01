@@ -16,5 +16,7 @@ IS
                             INDEX BY g_search_option_t;
 
     c_existing_searches CONSTANT g_search_option_aat := g_search_option_aat('binary' => 1, 'linear' => 2);
+    c_default_array CONSTANT global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt(-50, -40, -30, -20, -10, 10, 20, 30, 40, 50);
+    c_default_array_size CONSTANT PLS_INTEGER := 20;
 END global_types_consts_pkg;
 /

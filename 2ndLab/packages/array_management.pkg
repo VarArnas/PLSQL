@@ -1,3 +1,5 @@
+-----------------ARRAY MANAGEMENT PACKAGE-----------------------
+
 CREATE OR REPLACE PACKAGE array_management_pkg
 IS
     FUNCTION random_unique_nt_generation
@@ -17,26 +19,23 @@ END array_management_pkg;
 CREATE OR REPLACE PACKAGE BODY array_management_pkg
 IS
 
-    c_default_numbers CONSTANT global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt(-50, -40, -30, -20, -10, 10, 20, 30, 40, 50);
-
     FUNCTION random_unique_nt_generation
     (i_count IN PLS_INTEGER)
     RETURN global_types_consts_pkg.g_random_number_nt
     IS
         l_random_numbers global_types_consts_pkg.g_random_number_nt := global_types_consts_pkg.g_random_number_nt();
-        c_default_count CONSTANT PLS_INTEGER := 10;
     BEGIN
-        l_random_numbers.EXTEND(i_count);
 
         <<handle_value_error>>
         BEGIN
-            IF l_random_numbers.COUNT = 0 THEN
+            IF i_count <= 0 THEN
                 RAISE VALUE_ERROR;
             END IF;
+            l_random_numbers.EXTEND(i_count);
         EXCEPTION
             WHEN VALUE_ERROR THEN
                 exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
-                l_random_numbers.EXTEND(c_default_count);
+                l_random_numbers.EXTEND(global_types_consts_pkg.c_default_array_size);
             WHEN OTHERS THEN
                 RAISE;
         END handle_value_error;
@@ -108,7 +107,7 @@ IS
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
                 exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
-                l_sorted_random_numbers := c_default_numbers;
+                l_sorted_random_numbers := random_unique_nt_generation(global_types_consts_pkg.c_default_array_size);
             WHEN OTHERS THEN
                 RAISE;
         END check_if_invalid;
@@ -159,7 +158,7 @@ IS
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
                 exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
-                l_array := c_default_numbers;
+                l_array := global_types_consts_pkg.c_default_array;
             WHEN OTHERS THEN
                 RAISE;
         END check_if_invalid;

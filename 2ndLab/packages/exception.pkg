@@ -2,9 +2,9 @@
 
 CREATE OR REPLACE PACKAGE exception_pkg
 IS
-    c_non_positive_input CONSTANT NUMBER := -20001;
-    c_non_positive_input_message CONSTANT error_log.error_message%TYPE := 'A non positive number was given as random unique array size';
-    exec_non_positive_input EXCEPTION;
+    c_array_sizes_do_not_match CONSTANT NUMBER := -20001;
+    c_array_sizes_do_not_match_message CONSTANT error_log.error_message%TYPE := 'Two arrays were passed for search efficiencies, which sizes do not match';
+    exec_array_sizes_do_not_match EXCEPTION;
 
     c_non_existent_search CONSTANT NUMBER := -20002;
     c_non_existent_search_message CONSTANT error_log.error_message%TYPE := 'A non existent search option was given for getting search efficiencies';
@@ -14,7 +14,7 @@ IS
     c_empty_array_message CONSTANT error_log.error_message%TYPE := 'The passed in array did not have any elements';
     exec_empty_array_passed EXCEPTION;
 
-    PRAGMA EXCEPTION_INIT(exec_non_positive_input, c_non_positive_input);
+    PRAGMA EXCEPTION_INIT(exec_array_sizes_do_not_match, c_array_sizes_do_not_match);
     PRAGMA EXCEPTION_INIT(exec_non_existent_search, c_non_existent_search);
     PRAGMA EXCEPTION_INIT(exec_empty_array_passed, c_empty_array_passed);
 
@@ -90,7 +90,7 @@ IS
             CASE 
                 WHEN i_code BETWEEN -20999 AND -20001 THEN
                     CASE i_code
-                        WHEN -20001 THEN c_non_positive_input_message
+                        WHEN -20001 THEN c_array_sizes_do_not_match_message
                         WHEN -20002 THEN c_non_existent_search_message
                         WHEN -20003 THEN c_empty_array_message
                         ELSE c_default_message
