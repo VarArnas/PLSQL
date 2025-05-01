@@ -1,3 +1,5 @@
+-----------------EXCEPTION PACKAGE-------------------
+
 CREATE OR REPLACE PACKAGE exception_pkg
 IS
     c_array_sizes_do_not_match CONSTANT NUMBER := -20001;
@@ -18,7 +20,7 @@ IS
 
     c_default_message CONSTANT error_log.error_message%TYPE := 'An exception was raised which does not exist';
 
-    PROCEDURE handle_exception(i_backtrace IN VARCHAR2, i_code IN PLS_INTEGER, i_user IN error_log.username%TYPE, i_date IN error_log.error_time%TYPE);
+    PROCEDURE handle_exception;
 END exception_pkg;
 /
 
@@ -109,18 +111,20 @@ IS
     END;
 
     PROCEDURE handle_exception
-    (i_backtrace IN VARCHAR2,
-    i_code IN PLS_INTEGER,
-    i_user IN error_log.username%TYPE,
-    i_date IN error_log.error_time%TYPE) 
     IS
         l_err_msg error_log.error_message%TYPE;
         l_backtrace l_backtrace_rt;
         l_exception error_log%ROWTYPE;
+        SUBTYPE l_backtrace_t IS VARCHAR2(4000);
+
+        curr_backtrace l_backtrace_t := DBMS_UTILITY.FORMAT_ERROR_BACKTRACE;
+        l_code PLS_INTEGER := SQLCODE;
+        l_user error_log.username%TYPE := USER;
+        l_date error_log.error_time%TYPE := SYSDATE;
     BEGIN
-        l_err_msg := get_error_message(i_code);
-        l_backtrace := parse_backtrace(i_backtrace);
-        l_exception := map_data_to_error_log(i_code, l_err_msg, l_backtrace, i_user, i_date);
+        l_err_msg := get_error_message(l_code);
+        l_backtrace := parse_backtrace(curr_backtrace);
+        l_exception := map_data_to_error_log(l_code, l_err_msg, l_backtrace, l_user, l_date);
         save_exception(l_exception);
     END;
 END exception_pkg;
