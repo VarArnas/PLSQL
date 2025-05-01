@@ -149,7 +149,7 @@ IS
             l_unordered_array := i_unordered_array;  
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_unordered_array := global_types_consts_pkg.c_default_array;
             WHEN OTHERS THEN
                 RAISE;
@@ -170,7 +170,7 @@ IS
             l_ordered_array := i_ordered_array;  
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_ordered_array := global_types_consts_pkg.c_default_array;
             WHEN OTHERS THEN
                 RAISE;
@@ -183,7 +183,7 @@ IS
             END IF;
         EXCEPTION
             WHEN exception_pkg.exec_array_sizes_do_not_match THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_ordered_array := array_management_pkg.insertion_sort(l_unordered_array);
             WHEN OTHERS THEN
                 RAISE;
@@ -202,7 +202,7 @@ IS
             END LOOP;
         EXCEPTION
             WHEN exception_pkg.exec_non_existent_search THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_searches := global_types_consts_pkg.c_existing_searches;
             WHEN OTHERS THEN
                 RAISE;
@@ -239,7 +239,7 @@ IS
             END LOOP;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
 
                 <<add_non_existent_search_efficiencies>>
                 DECLARE

@@ -1,5 +1,3 @@
------------------EXCEPTION PACKAGE-------------------
-
 CREATE OR REPLACE PACKAGE exception_pkg
 IS
     c_array_sizes_do_not_match CONSTANT NUMBER := -20001;
@@ -88,15 +86,10 @@ IS
     BEGIN
          l_err_msg :=
             CASE 
-                WHEN i_code BETWEEN -20999 AND -20001 THEN
-                    CASE i_code
-                        WHEN -20001 THEN c_array_sizes_do_not_match_message
-                        WHEN -20002 THEN c_non_existent_search_message
-                        WHEN -20003 THEN c_empty_array_message
-                        ELSE c_default_message
-                    END
-                ELSE
-                    SQLERRM(i_code)
+                WHEN i_code = -20001 THEN c_array_sizes_do_not_match_message
+                WHEN i_code = -20002 THEN c_non_existent_search_message
+                WHEN i_code = -20003 THEN c_empty_array_message
+                ELSE SQLERRM(i_code)
             END;
             RETURN l_err_msg;
     END;

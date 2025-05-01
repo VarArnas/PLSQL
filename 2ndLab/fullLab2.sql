@@ -45,7 +45,7 @@ IS
 
     c_default_message CONSTANT error_log.error_message%TYPE := 'An exception was raised which does not exist';
 
-    PROCEDURE handle_exception(i_backtrace IN VARCHAR2, i_code IN PLS_INTEGER, i_user IN error_log.username%TYPE, i_date IN error_log.error_time%TYPE);
+    PROCEDURE handle_exception;
 END exception_pkg;
 /
 
@@ -113,15 +113,10 @@ IS
     BEGIN
          l_err_msg :=
             CASE 
-                WHEN i_code BETWEEN -20999 AND -20001 THEN
-                    CASE i_code
-                        WHEN -20001 THEN c_array_sizes_do_not_match_message
-                        WHEN -20002 THEN c_non_existent_search_message
-                        WHEN -20003 THEN c_empty_array_message
-                        ELSE c_default_message
-                    END
-                ELSE
-                    SQLERRM(i_code)
+                WHEN i_code = -20001 THEN c_array_sizes_do_not_match_message
+                WHEN i_code = -20002 THEN c_non_existent_search_message
+                WHEN i_code = -20003 THEN c_empty_array_message
+                ELSE SQLERRM(i_code)
             END;
             RETURN l_err_msg;
     END;
@@ -141,18 +136,20 @@ IS
     END;
 
     PROCEDURE handle_exception
-    (i_backtrace IN VARCHAR2,
-    i_code IN PLS_INTEGER,
-    i_user IN error_log.username%TYPE,
-    i_date IN error_log.error_time%TYPE) 
     IS
         l_err_msg error_log.error_message%TYPE;
         l_backtrace l_backtrace_rt;
         l_exception error_log%ROWTYPE;
+        SUBTYPE l_backtrace_t IS VARCHAR2(4000);
+
+        curr_backtrace l_backtrace_t := DBMS_UTILITY.FORMAT_ERROR_BACKTRACE;
+        l_code PLS_INTEGER := SQLCODE;
+        l_user error_log.username%TYPE := USER;
+        l_date error_log.error_time%TYPE := SYSDATE;
     BEGIN
-        l_err_msg := get_error_message(i_code);
-        l_backtrace := parse_backtrace(i_backtrace);
-        l_exception := map_data_to_error_log(i_code, l_err_msg, l_backtrace, i_user, i_date);
+        l_err_msg := get_error_message(l_code);
+        l_backtrace := parse_backtrace(curr_backtrace);
+        l_exception := map_data_to_error_log(l_code, l_err_msg, l_backtrace, l_user, l_date);
         save_exception(l_exception);
     END;
 END exception_pkg;
@@ -194,7 +191,7 @@ IS
             l_random_numbers.EXTEND(i_count);
         EXCEPTION
             WHEN VALUE_ERROR THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_random_numbers.EXTEND(global_types_consts_pkg.c_default_array_size);
             WHEN OTHERS THEN
                 RAISE;
@@ -266,7 +263,7 @@ IS
             l_sorted_random_numbers := i_random_numbers;       
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_sorted_random_numbers := random_unique_nt_generation(global_types_consts_pkg.c_default_array_size);
             WHEN OTHERS THEN
                 RAISE;
@@ -317,7 +314,7 @@ IS
             l_array := i_array;       
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_array := global_types_consts_pkg.c_default_array;
             WHEN OTHERS THEN
                 RAISE;
@@ -490,7 +487,7 @@ IS
             l_unordered_array := i_unordered_array;  
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_unordered_array := global_types_consts_pkg.c_default_array;
             WHEN OTHERS THEN
                 RAISE;
@@ -511,7 +508,7 @@ IS
             l_ordered_array := i_ordered_array;  
         EXCEPTION
             WHEN COLLECTION_IS_NULL OR exception_pkg.exec_empty_array_passed THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_ordered_array := global_types_consts_pkg.c_default_array;
             WHEN OTHERS THEN
                 RAISE;
@@ -524,7 +521,7 @@ IS
             END IF;
         EXCEPTION
             WHEN exception_pkg.exec_array_sizes_do_not_match THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_ordered_array := array_management_pkg.insertion_sort(l_unordered_array);
             WHEN OTHERS THEN
                 RAISE;
@@ -543,7 +540,7 @@ IS
             END LOOP;
         EXCEPTION
             WHEN exception_pkg.exec_non_existent_search THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
                 l_searches := global_types_consts_pkg.c_existing_searches;
             WHEN OTHERS THEN
                 RAISE;
@@ -580,7 +577,7 @@ IS
             END LOOP;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
-                exception_pkg.handle_exception(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, SQLCODE, USER, SYSDATE);
+                exception_pkg.handle_exception();
 
                 <<add_non_existent_search_efficiencies>>
                 DECLARE
@@ -630,14 +627,14 @@ DECLARE
     temp3 global_types_consts_pkg.g_search_option_aat := global_types_consts_pkg.g_search_option_aat('linear' => 1);
     temp4 PLS_INTEGER := 0;
 BEGIN
-    l_random_array := array_management_pkg.random_unique_nt_generation(l_n);
+    l_random_array := array_management_pkg.random_unique_nt_generation(-20);
 
     l_random_sorted_array := array_management_pkg.insertion_sort(l_random_array);
 
     l_search_efficiencies := search_pkg.get_search_efficiencies(
       i_unordered_array => l_random_array,
       i_ordered_array => l_random_sorted_array,
-      i_searches => temp3
+      i_searches => l_search_options
     );
 
     array_management_pkg.print_number_array(l_random_array, 'Unsorted array: ');
