@@ -83,7 +83,6 @@ IS
         COMMIT;
     EXCEPTION 
         WHEN OTHERS THEN
-            ROLLBACK;
             RAISE;
     END;
 
