@@ -126,12 +126,12 @@ IS
         i_table_name VARCHAR2,
         i_column_values insert_values_nt
     ) IS
-        v_cursor      INTEGER;
-        v_columns     insert_values_nt;
-        v_result      INTEGER;
-        v_sql         table_creation_pkg.sql_string_t;
-        v_col_count   NUMBER;
-        v_batch_count NUMBER;
+        l_cursor      INTEGER;
+        l_columns     insert_values_nt;
+        l_result      INTEGER;
+        l_sql         table_creation_pkg.sql_string_t;
+        l_col_count   NUMBER;
+        l_batch_count NUMBER;
         CURSOR cur_column_names(p_table_name IN VARCHAR2) IS SELECT column_name
                                                             FROM user_tab_columns
                                                             WHERE table_name = UPPER(p_table_name)
@@ -140,7 +140,7 @@ IS
         <<get_column_names>>
         BEGIN
             OPEN cur_column_names(i_table_name);
-            FETCH cur_column_names BULK COLLECT INTO v_columns;
+            FETCH cur_column_names BULK COLLECT INTO l_columns;
             CLOSE cur_column_names;
         EXCEPTION
             WHEN OTHERS THEN
@@ -151,46 +151,46 @@ IS
                 RAISE;
         END get_column_names;
         
-        v_col_count := v_columns.COUNT;
-        v_batch_count := i_column_values.COUNT / v_columns.COUNT;
+        l_col_count := l_columns.COUNT;
+        l_batch_count := i_column_values.COUNT / l_columns.COUNT;
         
-        v_sql := 'INSERT ALL ';
+        l_sql := 'INSERT ALL ';
         <<construct_row_insertion>>
         DECLARE
             l_start PLS_INTEGER := 1;
-            l_end PLS_INTEGER := v_col_count;
+            l_end PLS_INTEGER := l_col_count;
         BEGIN
             <<iterate_each_row>>
-            FOR indx IN 1..v_batch_count
+            FOR indx IN 1..l_batch_count
             LOOP
-                v_sql := v_sql || 'INTO ' || i_table_name || ' VALUES (';
+                l_sql := l_sql || 'INTO ' || i_table_name || ' VALUES (';
 
                 <<iterate_each_column>>
                 FOR i IN l_start..l_end LOOP
-                    v_sql := v_sql || ':' || i;
-                    IF i < l_end THEN v_sql := v_sql || ','; END IF;
+                    l_sql := l_sql || ':' || i;
+                    IF i < l_end THEN l_sql := l_sql || ','; END IF;
                 END LOOP iterate_each_column;
 
                 l_start := l_end + 1;
-                l_end := l_end + v_col_count;
-                v_sql := v_sql || ') ';
+                l_end := l_end + l_col_count;
+                l_sql := l_sql || ') ';
             END LOOP iterate_each_row;
         END construct_row_insertion;
-        v_sql := v_sql || ' SELECT * FROM dual';
+        l_sql := l_sql || ' SELECT * FROM dual';
         
-        v_cursor := DBMS_SQL.OPEN_CURSOR;
-        DBMS_SQL.PARSE(v_cursor, v_sql, DBMS_SQL.NATIVE);
+        l_cursor := DBMS_SQL.OPEN_CURSOR;
+        DBMS_SQL.PARSE(l_cursor, l_sql, DBMS_SQL.NATIVE);
         
         FOR i IN 1..i_column_values.COUNT LOOP
-            DBMS_SQL.BIND_VARIABLE(v_cursor, ':' || i, i_column_values(i));
+            DBMS_SQL.BIND_VARIABLE(l_cursor, ':' || i, i_column_values(i));
         END LOOP;
         
-        v_result := DBMS_SQL.EXECUTE(v_cursor);
-        DBMS_SQL.CLOSE_CURSOR(v_cursor);    
+        l_result := DBMS_SQL.EXECUTE(l_cursor);
+        DBMS_SQL.CLOSE_CURSOR(l_cursor);    
     EXCEPTION
         WHEN OTHERS THEN
-            IF DBMS_SQL.IS_OPEN(v_cursor) THEN
-                DBMS_SQL.CLOSE_CURSOR(v_cursor);
+            IF DBMS_SQL.IS_OPEN(l_cursor) THEN
+                DBMS_SQL.CLOSE_CURSOR(l_cursor);
             END IF;
             RAISE;
     END dynamic_insert;
@@ -199,7 +199,7 @@ END table_initialization_pkg;
 
 <<do_task>>
 DECLARE
-    v_values table_initialization_pkg.insert_values_nt;
+    l_values table_initialization_pkg.insert_values_nt;
     l_pairs table_initialization_pkg.pairs_nt := table_initialization_pkg.pairs_nt(); 
     l_years_men table_initialization_pkg.years_nt := table_initialization_pkg.years_nt();
     l_years_women table_initialization_pkg.years_nt := table_initialization_pkg.years_nt();
@@ -207,58 +207,58 @@ DECLARE
 BEGIN
 
     -- initialize Zenklas
-    v_values := table_initialization_pkg.insert_values_nt();
-    v_values.EXTEND(table_initialization_pkg.c_default_sign_values.COUNT*2);
+    l_values := table_initialization_pkg.insert_values_nt();
+    l_values.EXTEND(table_initialization_pkg.c_default_sign_values.COUNT*2);
     FOR indx IN 1..table_initialization_pkg.c_default_sign_values.COUNT LOOP
-        v_values((indx-1)*2 + 1) := table_initialization_pkg.c_default_sign_values(indx);
-        v_values((indx-1)*2 + 2) := 'Something about this sign';
+        l_values((indx-1)*2 + 1) := table_initialization_pkg.c_default_sign_values(indx);
+        l_values((indx-1)*2 + 2) := 'Something about this sign';
     END LOOP;
-    table_initialization_pkg.dynamic_insert('Zenklas', v_values);
+    table_initialization_pkg.dynamic_insert('Zenklas', l_values);
 
     -- initialize sekmingaPora
     l_pairs := table_initialization_pkg.create_random_sekmingos_poros(100);
-    v_values := table_initialization_pkg.insert_values_nt();
-    v_values.EXTEND(l_pairs.COUNT*3);
+    l_values := table_initialization_pkg.insert_values_nt();
+    l_values.EXTEND(l_pairs.COUNT*3);
     FOR indx IN 1..l_pairs.COUNT LOOP
-        v_values((indx-1)*3 + 1) := l_pairs(indx).numeris;
-        v_values((indx-1)*3 + 2) := l_pairs(indx).motersZenklas;
-        v_values((indx-1)*3 + 3) := l_pairs(indx).vyroZenklas;
+        l_values((indx-1)*3 + 1) := l_pairs(indx).numeris;
+        l_values((indx-1)*3 + 2) := l_pairs(indx).motersZenklas;
+        l_values((indx-1)*3 + 3) := l_pairs(indx).vyroZenklas;
     END LOOP;
-    table_initialization_pkg.dynamic_insert('sekmingaPora', v_values);
+    table_initialization_pkg.dynamic_insert('sekmingaPora', l_values);
 
     -- initialize sekmingiVyruMetai
     l_years_men := table_initialization_pkg.create_random_sekmingi_metai(50, 'sekmingiVyruMetai');
-    v_values := table_initialization_pkg.insert_values_nt();
-    v_values.EXTEND(l_years_men.COUNT*3);
+    l_values := table_initialization_pkg.insert_values_nt();
+    l_values.EXTEND(l_years_men.COUNT*3);
     FOR indx IN 1..l_years_men.COUNT LOOP
-        v_values((indx-1)*3 + 1) := l_years_men(indx).numeris;
-        v_values((indx-1)*3 + 2) := l_years_men(indx).metai;
-        v_values((indx-1)*3 + 3) := l_years_men(indx).zenklas;
+        l_values((indx-1)*3 + 1) := l_years_men(indx).numeris;
+        l_values((indx-1)*3 + 2) := l_years_men(indx).metai;
+        l_values((indx-1)*3 + 3) := l_years_men(indx).zenklas;
     END LOOP;
-    table_initialization_pkg.dynamic_insert('sekmingiVyruMetai', v_values);
+    table_initialization_pkg.dynamic_insert('sekmingiVyruMetai', l_values);
 
     -- initialize sekmingiMoteruMetai
     l_years_women := table_initialization_pkg.create_random_sekmingi_metai(50, 'sekmingiMoteruMetai');
-    v_values := table_initialization_pkg.insert_values_nt();
-    v_values.EXTEND(l_years_women.COUNT*3);
+    l_values := table_initialization_pkg.insert_values_nt();
+    l_values.EXTEND(l_years_women.COUNT*3);
     FOR indx IN 1..l_years_women.COUNT LOOP
-        v_values((indx-1)*3 + 1) := l_years_women(indx).numeris;
-        v_values((indx-1)*3 + 2) := l_years_women(indx).metai;
-        v_values((indx-1)*3 + 3) := l_years_women(indx).zenklas;
+        l_values((indx-1)*3 + 1) := l_years_women(indx).numeris;
+        l_values((indx-1)*3 + 2) := l_years_women(indx).metai;
+        l_values((indx-1)*3 + 3) := l_years_women(indx).zenklas;
     END LOOP;
-    table_initialization_pkg.dynamic_insert('sekmingiMoteruMetai', v_values);
+    table_initialization_pkg.dynamic_insert('sekmingiMoteruMetai', l_values);
 
     -- initialize Santuoka
     l_marriages := table_initialization_pkg.create_random_santuoka(100);
-    v_values := table_initialization_pkg.insert_values_nt();
-    v_values.EXTEND(l_marriages.COUNT*4);
+    l_values := table_initialization_pkg.insert_values_nt();
+    l_values.EXTEND(l_marriages.COUNT*4);
     FOR indx IN 1..l_marriages.COUNT LOOP
-        v_values((indx-1)*4 + 1) := l_marriages(indx).numeris;
-        v_values((indx-1)*4 + 2) := TO_CHAR(l_marriages(indx).registracijosData, 'DD-MON-YYYY');
-        v_values((indx-1)*4 + 3) := l_marriages(indx).motersZenklas;
-        v_values((indx-1)*4 + 4) := l_marriages(indx).vyroZenklas;
+        l_values((indx-1)*4 + 1) := l_marriages(indx).numeris;
+        l_values((indx-1)*4 + 2) := TO_CHAR(l_marriages(indx).registracijosData, 'DD-MON-YYYY');
+        l_values((indx-1)*4 + 3) := l_marriages(indx).motersZenklas;
+        l_values((indx-1)*4 + 4) := l_marriages(indx).vyroZenklas;
     END LOOP;
-    table_initialization_pkg.dynamic_insert('santuoka', v_values);
+    table_initialization_pkg.dynamic_insert('santuoka', l_values);
 END do_task;
 /
  
