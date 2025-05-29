@@ -1,0 +1,130 @@
+CREATE OR REPLACE PACKAGE marriage_operations_pkg
+IS
+    TYPE deletion_aat IS TABLE OF PLS_INTEGER
+                            INDEX BY VARCHAR2(128);
+
+    PROCEDURE insert_marriage(i_marriage santuoka%ROWTYPE);
+    PROCEDURE save_succesful_marriages;
+    FUNCTION remove_unsuccesful_marriages RETURN deletion_aat;
+END marriage_operations_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY marriage_operations_pkg
+IS
+    PROCEDURE insert_marriage(i_marriage santuoka%ROWTYPE)
+    IS
+    BEGIN
+        IF validation_pkg.is_marriage_succesful_by_pair(i_marriage) AND validation_pkg.is_marriage_succesful_by_year(i_marriage) THEN
+            INSERT INTO santuoka VALUES i_marriage;
+        END IF;
+    END insert_marriage;
+
+    PROCEDURE save_succesful_marriages
+    IS
+        l_marriages table_initialization_pkg.marriage_nt := table_initialization_pkg.marriage_nt();
+        CURSOR cur_marriages IS SELECT * FROM santuoka;
+        c_limit CONSTANT PLS_INTEGER := 100;
+    BEGIN
+        OPEN cur_marriages;
+        LOOP
+            FETCH cur_marriages BULK COLLECT INTO l_marriages LIMIT c_limit;
+            EXIT WHEN l_marriages.COUNT = 0;
+
+            <<validate_marriages>>
+            DECLARE
+                l_index PLS_INTEGER := l_marriages.FIRST;
+            BEGIN
+                WHILE l_index IS NOT NULL
+                LOOP
+                    IF NOT (validation_pkg.is_marriage_succesful_by_pair(l_marriages(l_index)) AND validation_pkg.is_marriage_succesful_by_year(l_marriages(l_index))) THEN
+                        l_marriages.DELETE(l_index);
+                    END IF;
+                    l_index := l_marriages.NEXT(l_index);
+                END LOOP;
+            END validate_marriages;
+
+            <<save_marriages>>
+            BEGIN
+                FORALL i IN INDICES OF l_marriages SAVE EXCEPTIONS
+                    INSERT INTO sekmingaSantuoka VALUES (sekmingaSantuoka_seq.NEXTVAL, l_marriages(i).registracijosData, l_marriages(i).motersZenklas, l_marriages(i).vyroZenklas);
+            EXCEPTION
+                WHEN exception_pkg.exec_dml_errors THEN
+                    DBMS_OUTPUT.PUT_LINE ('During sekmingaSantuoka insertion multiple exceptions were raised');
+                    FOR i in 1.. SQL%BULK_EXCEPTIONS.COUNT
+                    LOOP
+                        DBMS_OUTPUT.PUT_LINE(SQL%BULK_EXCEPTIONS(i).ERROR_INDEX);
+                        DBMS_OUTPUT.PUT_LINE(SQL%BULK_EXCEPTIONS(i).ERROR_CODE);
+                        DBMS_OUTPUT.PUT_LINE(SQLERRM(-1*SQL%BULK_EXCEPTIONS(i).ERROR_CODE));
+                    END LOOP;
+                    RAISE;
+                WHEN OTHERS THEN
+                    exception_pkg.handle_exception;
+                    RAISE;
+            END save_marriages;
+        END LOOP;
+        IF cur_marriages%ISOPEN THEN CLOSE cur_marriages; END IF; 
+    EXCEPTION
+            WHEN OTHERS THEN
+                exception_pkg.handle_exception;
+                IF cur_marriages%ISOPEN THEN CLOSE cur_marriages; END IF;
+                RAISE;
+    END save_succesful_marriages;
+
+    FUNCTION remove_unsuccesful_marriages
+    RETURN deletion_aat
+    IS
+        l_marriages table_initialization_pkg.marriage_nt := table_initialization_pkg.marriage_nt();
+        CURSOR cur_marriages IS SELECT * FROM santuoka;
+        c_limit CONSTANT PLS_INTEGER := 100;
+        l_deletions deletion_aat;
+    BEGIN
+        l_deletions('Santuoka') := 0;
+        OPEN cur_marriages;
+        LOOP
+            FETCH cur_marriages BULK COLLECT INTO l_marriages LIMIT c_limit;
+            EXIT WHEN l_marriages.COUNT = 0;
+
+            <<keep_bad_marriages>>
+            DECLARE
+                l_index PLS_INTEGER := l_marriages.FIRST;
+            BEGIN
+                WHILE l_index IS NOT NULL
+                LOOP
+                    IF validation_pkg.is_marriage_succesful_by_pair(l_marriages(l_index)) AND validation_pkg.is_marriage_succesful_by_year(l_marriages(l_index)) THEN
+                        l_marriages.DELETE(l_index);
+                    END IF;
+                    l_index := l_marriages.NEXT(l_index);
+                END LOOP;
+            END keep_bad_marriages;
+
+            <<delete_marriages>>
+            BEGIN
+                FORALL i IN INDICES OF l_marriages SAVE EXCEPTIONS
+                    DELETE FROM Santuoka WHERE numeris = l_marriages(i).numeris;
+                l_deletions('Santuoka') := l_deletions('Santuoka') + SQL%ROWCOUNT;
+            EXCEPTION
+                WHEN exception_pkg.exec_dml_errors THEN
+                    DBMS_OUTPUT.PUT_LINE ('During sekmingaSantuoka deletion multiple exceptions were raised');
+                    FOR i in 1.. SQL%BULK_EXCEPTIONS.COUNT
+                    LOOP
+                        DBMS_OUTPUT.PUT_LINE(SQL%BULK_EXCEPTIONS(i).ERROR_INDEX);
+                        DBMS_OUTPUT.PUT_LINE(SQL%BULK_EXCEPTIONS(i).ERROR_CODE);
+                        DBMS_OUTPUT.PUT_LINE(SQLERRM(-1*SQL%BULK_EXCEPTIONS(i).ERROR_CODE));
+                    END LOOP;
+                    RAISE;
+                WHEN OTHERS THEN
+                    exception_pkg.handle_exception;
+                    RAISE;
+            END delete_marriages;
+        END LOOP;
+        IF cur_marriages%ISOPEN THEN CLOSE cur_marriages; END IF; 
+
+        RETURN l_deletions;
+    EXCEPTION
+        WHEN OTHERS THEN
+                exception_pkg.handle_exception;
+                IF cur_marriages%ISOPEN THEN CLOSE cur_marriages; END IF;
+                RAISE;
+    END remove_unsuccesful_marriages;
+END marriage_operations_pkg;
+/
